@@ -220,6 +220,42 @@ class PostfixLogProcessor:
         return list(self.queue_map.values())
 
 
+class PostfixLogSummary:
+    """
+    Builds summary report from a series of transactions
+    Groups transactions by client_ip
+    """
+
+    def __init__(self):
+        self.parser = PostfixLogParser()
+        self.report = {}
+
+    def update_host_report(self, transaction):
+        
+        host = transaction['client_ip'] + ' (' + transaction['client_hostname'] +')'
+        
+        if host in self.report:
+            self.report[host]['transactions'] += 1
+            self.report[host]['messages'] += len(transaction['messages'])
+        else:
+            self.report[host] = {
+                'transactions': 1,
+                'messages': len(transaction['messages']),
+            }
+
+        for msg in transaction['messages']:
+            status = msg['status']
+            if status in self.report[host]:
+                self.report[host][status] += 1
+            else:
+                self.report[host][status] = 1
+
+        return None
+        
+    def get_report(self):
+        return self.report
+    
+
 def get_robust_stdin_reader(encoding_errors='replace'):
     """
     Create a robust stdin reader that can handle various encodings
@@ -254,16 +290,19 @@ def datetime_serializer(obj):
         return obj.isoformat()
     raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
-def print_json_output(output_dict, indent=None):
+
+def print_json_output(output_dict, indent=None, sort=False):
     json_output = json.dumps(
         output_dict,
         default=datetime_serializer,
         ensure_ascii=False,
         indent=indent,
+        sort_keys=sort,
     )
     print(json_output)
     sys.stdout.flush()
     return None
+
 
 def main():
     """Main CLI function"""
@@ -298,6 +337,12 @@ Examples:
         help='Output each parsed line immediately instead of grouping by transaction'
     )
     
+    parser.add_argument(
+        '--summary', '-s',
+        action='store_true',
+        help='Show summary info for transactions, grouped by client IP address'
+    )
+
     parser.add_argument(
         '--flush-remaining', '-f',
         action='store_true',
@@ -381,6 +426,11 @@ Examples:
         processor = PostfixLogProcessor(use_fallback_time=args.use_fallback_time)
         
         try:
+            # Summary mode: produce report grouped by client IP
+            if args.summary:
+                # Initialise summary by host
+                summary = PostfixLogSummary()
+            
             # Process stdin line by line
             for line in stdin_reader:
                 completed_entry = processor.process_line(line.strip())
@@ -390,11 +440,20 @@ Examples:
                     # Convert from_addr back to from for compatibility
                     if 'from_addr' in entry_dict:
                         entry_dict['from'] = entry_dict.pop('from_addr')
-                    
-                    print_json_output(entry_dict, indent)
+                        
+                    if args.summary:
+                        # Update summary report with current transaction
+                        summary.update_host_report(entry_dict)
+                    else:
+                        # Print output for single transaction
+                        print_json_output(entry_dict, indent)
             
+            if args.summary:
+                # Print summary report
+                print_json_output(summary.get_report(), indent, sort=True)
+
             # Optionally flush remaining incomplete transactions
-            if args.flush_remaining:
+            elif args.flush_remaining:
                 remaining_entries = processor.get_remaining_entries()
                 for entry in remaining_entries:
                     entry_dict = asdict(entry)
