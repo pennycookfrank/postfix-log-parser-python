@@ -254,6 +254,16 @@ def datetime_serializer(obj):
         return obj.isoformat()
     raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
+def print_json_output(output_dict, indent=None):
+    json_output = json.dumps(
+        output_dict,
+        default=datetime_serializer,
+        ensure_ascii=False,
+        indent=indent,
+    )
+    print(json_output)
+    sys.stdout.flush()
+    return None
 
 def main():
     """Main CLI function"""
@@ -312,8 +322,15 @@ Examples:
         action='store_true',
         help='Use fallback timestamps when client connection info is missing (message-id, from, or delivery time)'
     )
+
+    parser.add_argument(
+        '--indent', '-i',
+        action='store_true',
+        help='Produce indented output for easier reading.'
+    )
     
     args = parser.parse_args()
+    indent = 4 if args.indent else None
     
     # Set up stdin with proper encoding handling
     if args.encoding == 'auto':
@@ -347,9 +364,7 @@ Examples:
                     if 'to_addr' in log_dict:
                         log_dict['to'] = log_dict.pop('to_addr')
                     
-                    json_output = json.dumps(log_dict, default=datetime_serializer, ensure_ascii=False)
-                    print(json_output)
-                    sys.stdout.flush()
+                    print_json_output(log_dict, indent)
         
         except KeyboardInterrupt:
             pass
@@ -376,9 +391,7 @@ Examples:
                     if 'from_addr' in entry_dict:
                         entry_dict['from'] = entry_dict.pop('from_addr')
                     
-                    json_output = json.dumps(entry_dict, default=datetime_serializer, ensure_ascii=False)
-                    print(json_output)
-                    sys.stdout.flush()
+                    print_json_output(entry_dict, indent)
             
             # Optionally flush remaining incomplete transactions
             if args.flush_remaining:
@@ -388,9 +401,7 @@ Examples:
                     if 'from_addr' in entry_dict:
                         entry_dict['from'] = entry_dict.pop('from_addr')
                     
-                    json_output = json.dumps(entry_dict, default=datetime_serializer, ensure_ascii=False)
-                    print(json_output)
-                    sys.stdout.flush()
+                    print_json_output(entry_dict, indent)
         
         except KeyboardInterrupt:
             pass
