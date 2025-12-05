@@ -3,8 +3,14 @@
 Test script for postfix log parser
 """
 
+import sys
 import json
 from postfix_log_parser import PostfixLogParser, PostfixLogProcessor
+
+if not sys.warnoptions:
+    import os, warnings
+    warnings.simplefilter("default") # Change the filter in this process
+    os.environ["PYTHONWARNINGS"] = "default" # Also affect subprocesses
 
 
 def test_single_line_parsing():
@@ -55,9 +61,10 @@ def test_log_processing():
         
         json_output = json.dumps(entry_dict, default=str, indent=2, ensure_ascii=False)
         print(json_output)
+        print()
 
 
-def test_iso8601_parsing():
+def test_iso8601_timestamp_parsing():
     """Test ISO8601 timestamp parsing"""
     parser = PostfixLogParser()
     
@@ -66,7 +73,23 @@ def test_iso8601_parsing():
     
     result = parser.parse_line(test_line)
     
-    print("ISO8601 parsing test:")
+    print("ISO8601 timestamp parsing test:")
+    print(f"Time: {result.time}")
+    print(f"Hostname: {result.hostname}")
+    print(f"Queue ID: {result.queue_id}")
+    print()
+
+
+def test_syslog_timestamp_parsing():
+    """Test syslog-style timestamp parsing"""
+    parser = PostfixLogParser()
+    
+    # Test Syslog format (current year will be added)
+    test_line = "Dec 04 12:05:32 tiglath postfix/cleanup[8134]: 6E14C209C52: message-id=<aTF5DKHXLXILogoS@tiglath>"
+    #"Dec  7 12:35:52 mail postfix/smtpd[2531]: 5A064AE59201C: client=example.com[127.0.0.1]"
+    result = parser.parse_line(test_line)
+    
+    print("Syslog timestamp parsing test:")
     print(f"Time: {result.time}")
     print(f"Hostname: {result.hostname}")
     print(f"Queue ID: {result.queue_id}")
@@ -76,4 +99,5 @@ def test_iso8601_parsing():
 if __name__ == "__main__":
     test_single_line_parsing()
     test_log_processing()
-    test_iso8601_parsing()
+    test_iso8601_timestamp_parsing()
+    test_syslog_timestamp_parsing()

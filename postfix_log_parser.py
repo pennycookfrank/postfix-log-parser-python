@@ -63,7 +63,7 @@ class PostfixLogParser:
     """Parser for postfix log entries"""
     
     # Time formats
-    TIME_FORMAT_SYSLOG = "%b %d %H:%M:%S"
+    TIME_FORMAT_SYSLOG_PLUS_YEAR = "%Y %b %d %H:%M:%S"
     TIME_FORMAT_ISO8601 = "%Y-%m-%dT%H:%M:%S.%f%z"
     TIME_FORMAT_ISO8601_ALT = "%Y-%m-%dT%H:%M:%S%z"
     
@@ -94,12 +94,11 @@ class PostfixLogParser:
             except ValueError:
                 continue
         
-        # Try syslog format (without year)
+        # Try syslog format (first prepending year)
         try:
-            # Parse without year, then add current year
-            dt = datetime.strptime(time_str, self.TIME_FORMAT_SYSLOG)
             current_year = datetime.now().year
-            return dt.replace(year=current_year)
+            time_str = str(current_year) + ' ' + time_str
+            return datetime.strptime(time_str, self.TIME_FORMAT_SYSLOG_PLUS_YEAR)
         except ValueError:
             return None
     
